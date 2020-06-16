@@ -1,0 +1,32 @@
+profiles:
+- default
+config:
+ security.nesting: "true"
+ boot.autostart: "false"
+ linux.kernel_modules: ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter,overlay
+ user.vendor-data: |
+    #cloud-config
+    users:
+      - default
+    disable_root: 0
+    ssh_authorized_keys:
+      - "ssh-rsa "
+    timezone: Europe/Dublin
+ user.user-data: |
+    #cloud-config
+    packages:
+      - nfs-common
+devices:
+ eth0:
+  name: eth0
+  nictype: bridged
+  parent: br0
+  type: nic
+  hwaddr: 00:16:3e:ec:6a:ef
+ homedir:
+  path: /Users/user
+  source: /mnt/home-user/
+  type: disk
+limits:
+  cpu: 4
+

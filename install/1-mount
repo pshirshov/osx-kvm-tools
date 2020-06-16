@@ -1,0 +1,14 @@
+#!/bin/bash -xe
+base=/dev/sdb
+
+boot=${base}1
+root=${base}2
+swap=${base}3
+
+mkdir -p /mnt/gentoo
+mkdir -p /mnt/boot
+
+mount $boot /mnt/boot
+mount $root /mnt/gentoo
+swapon ${swap}
+

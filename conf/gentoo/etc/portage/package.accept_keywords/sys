@@ -1,0 +1,26 @@
+sys-kernel/gentoo-sources ~*
+sys-kernel/git-sources ~*
+
+dev-util/umockdev ~*
+sys-apps/bolt ~*
+
+dev-libs/nss ~*
+media-libs/libvpx ~*
+media-libs/libwebp ~*
+www-client/firefox ~*
+
+sec-policy/apparmor-profiles ~*
+sys-apps/apparmor ~*
+sys-apps/apparmor-utils ~*
+
+dev-util/jetbrains-toolbox ~*
+
+gnome-extra/gnome-shell-extension-appindicator ~*
+
+app-emulation/qemu ~*
+
+app-emulation/lxc ~*
+app-emulation/lxd ~*
+
+net-misc/xrdp ~*
+net-misc/xorgxrdp ~*

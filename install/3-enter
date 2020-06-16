@@ -1,0 +1,1 @@
+chroot /mnt/gentoo /bin/bash --rcfile /chroot-init -i

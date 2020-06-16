@@ -1,0 +1,7 @@
+media-libs/tiff -webp
+net-dns/avahi -gtk
+media-libs/mesa -vaapi
+sys-libs/libseccomp static-libs
+
+net-misc/xrdp neutrinordp
+net-misc/tigervnc server
