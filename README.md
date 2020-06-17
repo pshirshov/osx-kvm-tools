@@ -53,3 +53,11 @@ stderr_syslog=false           ; send stderr to syslog with process name (default
 ```
 
 Put `guest/forwardall` into `~/Documents/`
+
+Use `conf/lxc-docker.yaml` as to run docker in lxc:
+
+```
+lxc launch ubuntu:18.04 docker < lxc-docker.yaml
+```
+
+Install `docker-machine` from brew then use `./hack docker-reset` to setup your guest.
