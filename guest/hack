@@ -1,0 +1,116 @@
+#!/bin/bash -e
+
+set -e
+
+VMHOST=vmhost
+VMGUEST=vmguest
+VMDOCKER=vmdocker
+
+VMHOST_USER=root
+VMDOCKER_USER=root
+VMHOST_SSH=${VMHOST_USER}@${VMHOST}
+VMDOCKER_SSH=${VMDOCKER_USER}@${VMDOCKER}
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+SELFNAME=`basename "$0"`
+
+function docker-reset() {
+   ssh-keygen -R ${VMDOCKER}
+   ssh ${VMHOST_SSH} "lxc rm -f docker || true"
+   ssh ${VMHOST_SSH} "lxc launch ubuntu:18.04 docker < hackintosh/lxc-docker.yaml"
+
+   supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw || true
+   pkill -9 -f forwardall || true
+
+   docker-machine rm -f default || true
+   docker-machine create -d generic --generic-ip-address ${VMDOCKER} --generic-ssh-user ${VMDOCKER_USER} --engine-storage-driver btrfs default
+   #docker-machine create -d generic --generic-ip-address ${VMDOCKER} default
+   eval "$(docker-machine env default)"
+   supervisorctl -c /usr/local/etc/supervisord.ini start dockerfw   
+   docker-diag
+   docker-test
+}
+
+function docker-diag() {
+    printf "${GREEN}hostname:${NC} $(hostname)\n"
+    printf "${GREEN}hackintosh address:${NC}\n$(host ${VMGUEST})\n"
+    printf "${GREEN}hackintosh ifconfig:${NC}\n$(ifconfig | grep 192.168)\n"
+    printf "${GREEN}pinging docker:${NC}\n"
+    ping -c 1 ${VMDOCKER}
+    printf "${GREEN}checking available nfs mounts:${NC}\n"
+    ssh ${VMDOCKER_SSH} -o "StrictHostKeyChecking no" "showmount -e ${VMGUEST}"
+    printf "${GREEN}checking fstab:${NC}\n"
+    ssh ${VMHOST_SSH} "cat /etc/fstab | grep /Users"    
+    printf "${GREEN}checking mounts:${NC}\n"
+    ssh ${VMHOST_SSH} "mount | grep /Users"     
+    printf "${GREEN}checking container:${NC}\n"
+    ssh ${VMHOST_SSH} "lxc list | grep docker"   
+    printf "${GREEN}checking forwarder:${NC}\n"
+    ssh ${VMHOST_SSH} "ps aux|grep forwardall"   
+    supervisorctl -c /usr/local/etc/supervisord.ini status dockerfw   
+    supervisorctl -c /usr/local/etc/supervisord.ini tail -300 dockerfw
+}
+
+function docker-test() {
+   docker run --name nginx-test -v `pwd`:/usr/share/nginx/html:ro -p 8989:80 -d nginx
+
+   n=0
+   until [ "$n" -ge 5 ]
+   do
+      printf "${GREEN}Trying nginx container...${NC}\n"
+      out=$(curl http://localhost:8989/${SELFNAME}) && break
+      n=$((n+1)) 
+      sleep 1
+   done
+   printf "${GREEN}Got output...${NC}\n"
+   docker rm -f nginx-test
+
+   if [[ $out == *"--name nginx-test"* ]]; then
+      printf "${GREEN}Docker works!${NC}\n"
+   fi
+}
+
+function reboot() {
+   ssh ${VMHOST_SSH} "lxc stop docker"
+   ssh -f ${VMHOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -r now"   
+   osascript -e 'tell app "System Events" to shut down'
+}
+
+function off() {
+   ssh ${VMHOST_SSH} "lxc stop docker"
+   ssh -f ${VMHOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -P now"
+   osascript -e 'tell app "System Events" to shut down'
+}
+
+for i in "$@"
+do
+case $i in
+    docker-reset)
+        docker-reset
+    ;;
+
+    docker-diag)
+        docker-diag
+    ;;
+
+    docker-test)
+        docker-test
+    ;;
+
+    reboot)    
+        reboot
+    ;;
+
+    off)    
+        off
+    ;;
+
+    *)
+        echo "Unknown option"
+        exit 1
+    ;;
+esac
+done
