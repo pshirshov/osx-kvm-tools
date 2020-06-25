@@ -2,86 +2,162 @@
 
 set -e
 
-VMHOST=vmhost
-VMGUEST=vmguest
-VMDOCKER=vmdocker
+readonly BINPATH="$0"
+readonly TRUEPATH=$(readlink ${BINPATH})
+readonly SELFNAME=$(basename $TRUEPATH)
+readonly SELFPATH=$(cd "$(dirname $TRUEPATH)"; pwd -P)
 
-VMHOST_USER=root
-VMDOCKER_USER=root
-VMHOST_SSH=${VMHOST_USER}@${VMHOST}
-VMDOCKER_SSH=${VMDOCKER_USER}@${VMDOCKER}
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-SELFNAME=`basename "$0"`
+source $SELFPATH/settings
 
 function docker-reset() {
-   ssh-keygen -R ${VMDOCKER}
-   ssh ${VMHOST_SSH} "lxc rm -f docker || true"
-   ssh ${VMHOST_SSH} "lxc launch ubuntu:18.04 docker < hackintosh/lxc-docker.yaml"
-
    supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw || true
    pkill -9 -f forwardall || true
 
+   tmpconfig=/tmp/lxc-docker-config.yaml
+
+   pubkey=$(cat ~/.ssh/id_rsa.pub)
+
+   cat <<EOT > $tmpconfig
+profiles:
+- default
+config:
+   security.nesting: "true"
+   boot.autostart: "false"
+   linux.kernel_modules: ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter,overlay
+   user.vendor-data: |
+      #cloud-config
+      users:
+         - default
+      disable_root: 0
+      ssh_authorized_keys:
+         - "${pubkey}"
+      timezone: Europe/Dublin
+   user.user-data: |
+      #cloud-config
+      packages:
+         - nfs-common
+         - openssh-server
+devices:
+   eth0:
+      name: eth0
+      nictype: bridged
+      parent: br0
+      type: nic
+      hwaddr: ${MAC_VM_DOCKER_MACADDR}
+   homedir:
+      path: ${HOME}
+      source: /mnt/home-pavel/
+      type: disk
+   tmpdir:
+      path: /private/var/folders
+      source: /mnt/var-folders/
+      type: disk
+limits:
+   cpu: 4
+EOT
+
+   cat <<EOT > /usr/local/etc/supervisor.d/docker.ini
+[program:dockerfw]
+command=/bin/bash ${SELFPATH}/forwardall
+stopsignal=KILL
+killasgroup=true
+stdout_logfile=/tmp/dockerfw.out.log        ; stdout log path, NONE for none; default AUTO
+stdout_logfile_maxbytes=1MB   ; max # logfile bytes b4 rotation (default 50MB)
+stdout_logfile_backups=1      ; # of stdout logfile backups (0 means none, default 10)
+stdout_capture_maxbytes=1MB   ; number of bytes in 'capturemode' (default 0)
+stdout_events_enabled=false   ; emit events on stdout writes (default false)
+stdout_syslog=false           ; send stdout to syslog with process name (default false)
+stderr_logfile=/tmp/dockerfw.err.log        ; stderr log path, NONE for none; default AUTO
+stderr_logfile_maxbytes=1MB   ; max # logfile bytes b4 rotation (default 50MB)
+stderr_logfile_backups=1      ; # of stderr logfile backups (0 means none, default 10)
+stderr_capture_maxbytes=1MB   ; number of bytes in 'capturemode' (default 0)
+stderr_events_enabled=false   ; emit events on stderr writes (default false)
+stderr_syslog=false           ; send stderr to syslog with process name (default false)
+EOT
+
+   ssh-keygen -R ${MAC_VM_DOCKER}
+   scp $tmpconfig ${MAC_VM_HOST_SSH}:$tmpconfig
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN rm -f docker || true"
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN launch $BASEIMAGE docker < $tmpconfig"
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN exec docker -- /usr/bin/cloud-init status -w"
+
    docker-machine rm -f default || true
-   docker-machine create -d generic --generic-ip-address ${VMDOCKER} --generic-ssh-user ${VMDOCKER_USER} --engine-storage-driver btrfs default
-   #docker-machine create -d generic --generic-ip-address ${VMDOCKER} default
+   docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} --generic-ssh-user ${MAC_VM_DOCKER_USER} --engine-storage-driver btrfs default
+   #docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} default
    eval "$(docker-machine env default)"
-   supervisorctl -c /usr/local/etc/supervisord.ini start dockerfw   
+   supervisorctl -c /usr/local/etc/supervisord.ini update dockerfw
+   supervisorctl -c /usr/local/etc/supervisord.ini start dockerfw
    docker-diag
    docker-test
 }
 
 function docker-diag() {
+    printf "${GREEN}nfsd status:${NC}\n$(nfsd status)\n"
+    printf "${GREEN}nfsd check:${NC}\n$(nfsd checkexports)\n"
     printf "${GREEN}hostname:${NC} $(hostname)\n"
-    printf "${GREEN}hackintosh address:${NC}\n$(host ${VMGUEST})\n"
+    printf "${GREEN}hackintosh address:${NC}\n$(host ${MAC_VM_GUEST})\n"
     printf "${GREEN}hackintosh ifconfig:${NC}\n$(ifconfig | grep 192.168)\n"
     printf "${GREEN}pinging docker:${NC}\n"
-    ping -c 1 ${VMDOCKER}
-    printf "${GREEN}checking available nfs mounts:${NC}\n"
-    ssh ${VMDOCKER_SSH} -o "StrictHostKeyChecking no" "showmount -e ${VMGUEST}"
+    ping -c 1 ${MAC_VM_DOCKER}
     printf "${GREEN}checking fstab:${NC}\n"
-    ssh ${VMHOST_SSH} "cat /etc/fstab | grep /Users"    
-    printf "${GREEN}checking mounts:${NC}\n"
-    ssh ${VMHOST_SSH} "mount | grep /Users"     
+    ssh ${MAC_VM_HOST_SSH} "cat /etc/fstab | grep nfs"
+    printf "${GREEN}checking host mounts:${NC}\n"
+    ssh ${MAC_VM_HOST_SSH} "mount | grep nfs"
+    printf "${GREEN}checking available nfs mounts:${NC}\n"
+    ssh ${MAC_VM_DOCKER_SSH} -o "StrictHostKeyChecking no" "showmount -e ${MAC_VM_GUEST}"
+    printf "${GREEN}checking lxc-docker mounts:${NC}\n"
+    ssh ${MAC_VM_DOCKER_SSH} -o "StrictHostKeyChecking no" "mount | grep nfs"
     printf "${GREEN}checking container:${NC}\n"
-    ssh ${VMHOST_SSH} "lxc list | grep docker"   
+    ssh ${MAC_VM_HOST_SSH} "$LXCBIN list | grep docker"
     printf "${GREEN}checking forwarder:${NC}\n"
-    ssh ${VMHOST_SSH} "ps aux|grep forwardall"   
-    supervisorctl -c /usr/local/etc/supervisord.ini status dockerfw   
+    ps aux | grep forwardall | grep -v grep
+    printf "${GREEN}forwarder status:${NC}\n"
+    supervisorctl -c /usr/local/etc/supervisord.ini status dockerfw
+    printf "${GREEN}forwarder tail:${NC}\n"
     supervisorctl -c /usr/local/etc/supervisord.ini tail -300 dockerfw
 }
 
 function docker-test() {
-   docker run --name nginx-test -v `pwd`:/usr/share/nginx/html:ro -p 8989:80 -d nginx
+   readonly testname=docker-test.html
+   readonly token=$(uuidgen)
+   readonly shareddir=$HOME
+   readonly sharedfile=${shareddir}/${testname}
+
+   trap "(rm -f ${sharedfile}) && (docker rm -f nginx-test || true) && (echo cleanup!)" RETURN
+
+   echo "${token}" > $sharedfile
+   url="http://localhost:8989/${testname}"
+
+   docker rm -f nginx-test || true
+   docker run --name nginx-test -v ${shareddir}:/usr/share/nginx/html:ro -p 8989:80 -d nginx
 
    n=0
    until [ "$n" -ge 5 ]
    do
-      printf "${GREEN}Trying nginx container...${NC}\n"
-      out=$(curl http://localhost:8989/${SELFNAME}) && break
-      n=$((n+1)) 
+      printf "${GREEN}Trying to fetch ${url}...${NC}\n"
+      out=$(curl ${url}) && break
+      n=$((n+1))
       sleep 1
    done
    printf "${GREEN}Got output...${NC}\n"
-   docker rm -f nginx-test
 
-   if [[ $out == *"--name nginx-test"* ]]; then
+   if [[ $out == *${token}* ]]; then
       printf "${GREEN}Docker works!${NC}\n"
+   else
+      printf "${RED}Unexpected output:${NC}\n${out}\n"
+      exit 1
    fi
 }
 
 function reboot() {
-   ssh ${VMHOST_SSH} "lxc stop docker"
-   ssh -f ${VMHOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -r now"   
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -r now"
    osascript -e 'tell app "System Events" to shut down'
 }
 
 function off() {
-   ssh ${VMHOST_SSH} "lxc stop docker"
-   ssh -f ${VMHOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -P now"
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 3 && umount /mnt/home-pavel/ && shutdown -P now"
    osascript -e 'tell app "System Events" to shut down'
 }
 
@@ -100,11 +176,11 @@ case $i in
         docker-test
     ;;
 
-    reboot)    
+    reboot)
         reboot
     ;;
 
-    off)    
+    off)
         off
     ;;
 

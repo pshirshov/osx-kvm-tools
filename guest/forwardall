@@ -3,16 +3,9 @@
 set -e
 #set -x
 
-readonly DOCKER_MACHINE_MACHINE_NAME=default
-readonly VMHOST="root@vmhost"
-readonly DOCKER_LXC_HOST="root@vmdocker"
-readonly DOCKER_LXC_ID=docker
-
-export PATH=/usr/local/bin:$PATH
-readonly ABSPATH=$(cd "$(dirname "$0")"; pwd -P)
-readonly PROGNAME=$(basename $0)
-readonly DOCKER_MACHINE_BIN=docker-machine
-readonly DOCKER_BIN=docker
+readonly SELFNAME=$(basename $(readlink $0))
+readonly SELFPATH=$(cd "$(dirname $(readlink "$0")))"; pwd -P)
+source $SELFPATH/settings
 
 eval "$(${DOCKER_MACHINE_BIN} env ${DOCKER_MACHINE_MACHINE_NAME})"
 
@@ -25,30 +18,30 @@ pf() {
     quiet="false"
     hostport="$1"
 
-    usage="${PROGNAME} <port> [-h] [-s] [-f] [-e] [-hp] -- Forwards a docker-machine port so that you can access it locally
+    usage="${SELFNAME} <port> [-h] [-s] [-f] [-e] [-hp] -- Forwards a docker-machine port so that you can access it locally
 
     where:
         -h, --help		Show this help text
         -s, --stop 		Stop the port forwarding process
         -f, --foreground	Run the docker-machine ssh client in foreground instead of background
         -e, --environment	The name of the docker-machine environment (default is default)
-        -q, --quiet		Don't print anything to the console, not even errors    
+        -q, --quiet		Don't print anything to the console, not even errors
 
     examples:
         # Port forward port 8047 in docker-machine environment default
-        \$ ${PROGNAME} 8047
+        \$ ${SELFNAME} 8047
 
         # Port forward docker port 8047 to host port 8087 in docker-machine environment default
-        \$ ${PROGNAME} 8087:8047
+        \$ ${SELFNAME} 8087:8047
 
         # Port forward port 8047 in docker-machine dev
-        \$ ${PROGNAME} 8047 -e dev
+        \$ ${SELFNAME} 8047 -e dev
 
         # Runs in foreground (port forwarding is automatically stopped when process is terminated)
-        \$ ${PROGNAME} 8047 -f
+        \$ ${SELFNAME} 8047 -f
 
         # Stop the port forwarding for this port
-        \$ ${PROGNAME} 8047 -s"
+        \$ ${SELFNAME} 8047 -s"
 
     if [ $# -eq 0 ]; then
         echo "$usage"
@@ -71,7 +64,7 @@ pf() {
                 ;;
             -f|--foreground)
                 foreground="true"
-                ;;		
+                ;;
             -s|--stop)
                 stop="true"
                 ;;
@@ -100,12 +93,12 @@ pf() {
     }
 
     # Check if port contains ":", if so we should split
-    if [[ $port == *":"* ]]; then	
+    if [[ $port == *":"* ]]; then
         # Split by :
         ports=(${port//:/ })
         if [[ ${#ports[@]} != 2 ]]; then
-            if [[ $quiet == "false" ]]; then 
-                echo "Port forwarding should be defined as hostport:targetport, for example: 8090:8080"
+            if [[ $quiet == "false" ]]; then
+                echo "[`date`] Port forwarding should be defined as hostport:targetport, for example: 8090:8080"
             fi
             exit 1
         fi
@@ -121,26 +114,26 @@ pf() {
 
         if [ -z "${result}"  ]; then
             if [[ $quiet == "false" ]]; then
-                echo "Port $hostport is not forwarded, cannot stop"
-            fi		
+                echo "[`date`] Port $hostport is not forwarded, cannot stop"
+            fi
             exit 1
-        fi 
+        fi
 
         process=`echo "${result}" | awk '{ print $1 }'`
         if [[ $process != "ssh" ]]; then
-            if [[ $quiet == "false" ]]; then 
-                echo "Port $hostport is bound by process ${process} and not by docker-machine, won't stop"
+            if [[ $quiet == "false" ]]; then
+                echo "[`date`] Port $hostport is bound by process ${process} and not by docker-machine, won't stop"
             fi
             exit 1
         fi
 
         pid=`echo "${result}" | awk '{ print $2 }'` &&
         kill $pid &&
-        echo "Stopped port forwarding for $hostport"		
+        echo "[`date`] Stopped port forwarding for $hostport"
     else
-        docker-machine ssh $environment -F ~/.ssh/config `if [[ ${foreground} == "false" ]]; then echo "-f -N"; fi` -L $hostport:localhost:$port && 
+        docker-machine ssh $environment -F ~/.ssh/config `if [[ ${foreground} == "false" ]]; then echo "-f -N"; fi` -L $hostport:localhost:$port &&
         if [[ $quiet == "false" ]] && [[ $foreground == "false" ]]; then
-            printf "Forwarding port $port"
+            printf "[`date`] Forwarding port $port"
             if [[ $hostport -ne $port ]]; then
                 printf " to host port $hostport"
             fi
@@ -155,7 +148,7 @@ map_ports () {
     ports="$(${DOCKER_BIN} inspect -f '{{range $p, $conf := .NetworkSettings.Ports }} {{ if $conf}} {{$conf}} {{end}} {{end}}' "${containerid}" | sed -nE 's:\[\{[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[^0-9]*([0-9]{1,})\}\]:\1:pg' | xargs echo -n)"
     [[ -z ${ports} ]] || {
         for port in $ports;  do
-            echo "Enabling port forwarding: ${port} -> ${DOCKER_MACHINE_IP}:${port}"
+            echo "[`date`] Enabling port forwarding: ${port} -> ${DOCKER_MACHINE_IP}:${port}"
             >&2 pf ${port} -e ${DOCKER_MACHINE_NAME}
         done
     }
@@ -166,20 +159,20 @@ on_exit() {
 }
 
 do_map() {
-    echo "Starting portmap loop..."
-    echo "Ensuring the container is running..."
-    ssh $VMHOST "lxc start $DOCKER_LXC_ID || true" 
+    echo "[`date`] Starting portmap loop..."
+    echo "[`date`] Ensuring the container is running..."
+    ssh $MAC_VM_HOST "lxc start $DOCKER_LXC_ID || true"
 
-    echo "Dropping existing sessions..."
-    pkill -9 -f $DOCKER_LXC_HOST || true
+    echo "[`date`] Dropping existing sessions..."
+    pkill -9 -f $MAC_VM_DOCKER_SSH || true
 
-    echo "Restoring sessions for running containers..."
-    for running in $(docker ps -q) ; do 
-        echo "${running}..."
+    echo "[`date`] Restoring sessions for running containers..."
+    for running in $(docker ps -q) ; do
+        echo "[`date`] ${running}..."
         map_ports $running
-    done 
+    done
 
-    echo "Listening for updates..."
+    echo "[`date`] Listening for updates..."
     while read -r event;
     do
         subject=$(echo $event | awk '{ print $2 }')

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -e
+
+source /Users/$USER/Documents/hackintosh.docker.sh
+
+readonly MAC_VM_HOST=${MAC_VM_HOST?'Missing $MAC_VM_HOST'}
+readonly MAC_VM_GUEST=${MAC_VM_GUEST?'Missing MAC_VM_GUEST'}
+readonly MAC_VM_DOCKER=${MAC_VM_DOCKER?'Missing MAC_VM_DOCKER'}
+readonly MAC_VM_DOCKER_MACADDR=${MAC_VM_DOCKER_MACADDR?'Missing MAC_VM_DOCKER_MACADDR'}
+
+readonly MAC_VM_HOST_USER=${MAC_VM_HOST_USER:-root}
+readonly MAC_VM_DOCKER_USER=${MAC_VM_DOCKER_USER:-root}
+
+readonly MAC_VM_HOST_SSH=${MAC_VM_HOST_USER}@${MAC_VM_HOST}
+readonly MAC_VM_DOCKER_SSH=${MAC_VM_DOCKER_USER}@${MAC_VM_DOCKER}
+
+readonly DOCKER_MACHINE_MACHINE_NAME=default
+readonly DOCKER_LXC_ID=docker
+
+export PATH=/usr/local/bin:$PATH
+readonly DOCKER_MACHINE_BIN=docker-machine
+readonly DOCKER_BIN=docker
+
+readonly LXCBIN=/usr/bin/lxc
+readonly BASEIMAGE=images:ubuntu/20.04/cloud
+#BASEIMAGE=images:f4e1014eb838
+
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly NC='\033[0m'
+
