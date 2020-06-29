@@ -3,11 +3,11 @@
 set -e
 
 readonly BINPATH="$0"
-readonly TRUEPATH=$(readlink ${BINPATH})
+readonly TRUEPATH=$(readlink ${BINPATH} || echo $BINPATH)
 readonly SELFNAME=$(basename $TRUEPATH)
 readonly SELFPATH=$(cd "$(dirname $TRUEPATH)"; pwd -P)
-
 source $SELFPATH/settings
+
 
 function docker-reset() {
    supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw || true

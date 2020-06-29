@@ -3,11 +3,13 @@
 set -e
 #set -x
 
-readonly SELFNAME=$(basename $(readlink $0))
-readonly SELFPATH=$(cd "$(dirname $(readlink "$0")))"; pwd -P)
+echo "[`date`] Reading settings..."
+readonly BINPATH="$0"
+readonly TRUEPATH=$(readlink ${BINPATH} || echo $BINPATH)
+readonly SELFNAME=$(basename $TRUEPATH)
+readonly SELFPATH=$(cd "$(dirname $TRUEPATH)"; pwd -P)
 source $SELFPATH/settings
-
-eval "$(${DOCKER_MACHINE_BIN} env ${DOCKER_MACHINE_MACHINE_NAME})"
+echo "[`date`] Done"
 
 pf() {
 
