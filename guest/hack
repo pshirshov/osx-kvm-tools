@@ -89,6 +89,7 @@ EOT
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN rm -f docker || true"
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN launch $BASEIMAGE docker < $tmpconfig"
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN exec docker -- /usr/bin/cloud-init status -w"
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN restart docker"
 
    docker-machine rm -f default || true
    docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} --generic-ssh-user ${MAC_VM_DOCKER_USER} --engine-storage-driver btrfs default
