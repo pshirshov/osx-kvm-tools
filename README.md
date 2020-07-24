@@ -42,12 +42,13 @@ Notes:
 
 1. Run `nfsd checkexports && sudo nfsd update`
 3. Install `supervisord` from `brew`, use `brew services` to enable it
-4. Put your public key under `~/.ssh/id_rsa.pub`, make sure `root` user can login onto your VM host with this key
+4. Put your public key under `~/.ssh/id_rsa.pub`, make sure `root` user can login onto your VM host with this key without password
 5. Create `~/Documents/hackintosh.docker.sh` with content like:
 
 ```
 export MAC_VM_HOST=host-name
 export MAC_VM_GUEST=guest-name
+export MAC_VM_GUEST_USER=user
 export MAC_VM_DOCKER=docker-name
 export MAC_VM_DOCKER_MACADDR="aa:bb:cc:dd:ee:ff"
 
@@ -60,4 +61,4 @@ if [[ $(hostname) == "${MAC_VM_GUEST}" ]]; then
 fi
 ```
 
-6. Install `docker-machine` from brew then use `./hack docker-reset` to setup your guest.
+6. Install `brew install docker docker-machine && brew link docker`  then use `./hack docker-reset` to setup your guest.
