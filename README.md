@@ -48,7 +48,6 @@ Notes:
 ```
 export MAC_VM_HOST=host-name
 export MAC_VM_GUEST=guest-name
-export MAC_VM_GUEST_USER=user
 export MAC_VM_DOCKER=docker-name
 export MAC_VM_DOCKER_MACADDR="aa:bb:cc:dd:ee:ff"
 
