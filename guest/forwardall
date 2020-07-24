@@ -163,7 +163,7 @@ on_exit() {
 do_map() {
     echo "[`date`] Starting portmap loop..."
     echo "[`date`] Ensuring the container is running..."
-    ssh $MAC_VM_HOST "lxc start $DOCKER_LXC_ID || true"
+    ssh ${MAC_VM_HOST_SSH} "lxc start $DOCKER_LXC_ID || true"
 
     echo "[`date`] Dropping existing sessions..."
     pkill -9 -f $MAC_VM_DOCKER_SSH || true
