@@ -158,16 +158,22 @@ function docker-test() {
    fi
 }
 
-function off() {
-   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
+function stopdocker() {
+   /usr/local/bin/supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop -f docker || true"
+   #ssh ${MAC_VM_HOST_SSH} "systemctl stop lxd || true"
+   #ssh ${MAC_VM_HOST_SSH} "pkill -9 -f /var/lib/lxd/containers || true"
    ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
+}
+
+function off() {
+   stopdocker
    ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl poweroff"'
    osascript -e 'tell app "System Events" to shut down'
 }
 
 function reboot() {
-   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
-   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
+   stopdocker
    ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl reboot"'
    osascript -e 'tell app "System Events" to shut down'
 }
@@ -177,18 +183,15 @@ function reboot-target() {
    ssh ${MAC_VM_HOST_SSH} "mount /boot || true"
 
    TARGET_INDEX=$(ssh ${MAC_VM_HOST_SSH} "cat /boot/grub/grub.cfg | grep -E '^menuentry' | grep -n $1 | cut -d : -f 1 | head -n 1")
-
-   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
-   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
    ssh ${MAC_VM_HOST_SSH} "grub-reboot $(($TARGET_INDEX-1))"
 
+   stopdocker
    ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl reboot"'
    osascript -e 'tell app "System Events" to shut down'
 }
 
 function reboot-bios() {
-   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
-   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
+   stopdocker
    ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl --firmware-setup reboot"'
    osascript -e 'tell app "System Events" to shut down'
 }
