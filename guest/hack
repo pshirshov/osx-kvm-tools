@@ -161,22 +161,35 @@ function docker-test() {
 function off() {
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
    ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
-   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && shutdown -P now"'
+   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl poweroff"'
    osascript -e 'tell app "System Events" to shut down'
 }
 
 function reboot() {
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
    ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
-   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && shutdown -r now"'
+   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl reboot"'
    osascript -e 'tell app "System Events" to shut down'
 }
 
-function reboot-novm() {
+
+function reboot-target() {
+   ssh ${MAC_VM_HOST_SSH} "mount /boot || true"
+
+   TARGET_INDEX=$(ssh ${MAC_VM_HOST_SSH} "cat /boot/grub/grub.cfg | grep -E '^menuentry' | grep -n $1 | cut -d : -f 1 | head -n 1")
+
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
    ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
-   ssh ${MAC_VM_HOST_SSH} "grub-reboot ${MAC_VM_HOST_NOVM_GRUB_INDEX}"
-   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && shutdown -r now"'
+   ssh ${MAC_VM_HOST_SSH} "grub-reboot $(($TARGET_INDEX-1))"
+
+   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl reboot"'
+   osascript -e 'tell app "System Events" to shut down'
+}
+
+function reboot-bios() {
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
+   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
+   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 3 && systemctl --firmware-setup reboot"'
    osascript -e 'tell app "System Events" to shut down'
 }
 
@@ -185,40 +198,64 @@ function suspend() {
    osascript -e 'tell app "System Events" to shut down'
 }
 
-for i in "$@"
-do
-case $i in
-    docker-reset)
-        docker-reset
-    ;;
 
-    docker-diag)
-        docker-diag
-    ;;
+if [[ "$#" -gt 0 ]]; then
+    arg=$1
+    shift
 
-    docker-test)
-        docker-test
-    ;;
-
-    reboot)
-        reboot
-    ;;
-
-    reboot-novm)
-        reboot-novm
-    ;;
-
-    suspend)
-        suspend
-    ;;
-
-    off)
-        off
-    ;;
-
-    *)
-        echo "Unknown option"
-        exit 1
-    ;;
-esac
-done
+    case $arg in
+        off)
+            off
+        ;;
+        suspend)
+            suspend
+        ;;
+        reboot)
+            if [[ "$#" -eq 0 ]]; then
+                reboot
+            else
+                target=$1
+                shift
+                case $target in
+                  win)
+                     reboot-target Windows
+                  ;;
+                  ubuntu)
+                     reboot-target Ubuntu
+                  ;;
+                  novm)
+                     reboot-target novm
+                  ;;
+                  bios)
+                     reboot-bios
+                  ;;
+                esac
+                echo "reboot target: $target"
+            fi
+        ;;
+        docker)
+            while [[ "$#" -gt 0 ]]; do
+                arg=$1
+                shift
+                case $arg in
+                    diag)
+                        docker-diag
+                    ;;
+                    test)
+                        docker-test
+                    ;;
+                    reset)
+                        docker-reset
+                    ;;
+                esac
+            done
+         ;;
+         *)
+            echo "Unexpected command: $*"
+            exit 1
+         ;;
+    esac
+else
+    echo "An argument required"
+    exit 1
+fi
