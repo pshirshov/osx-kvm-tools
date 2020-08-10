@@ -8,7 +8,6 @@ readonly SELFNAME=$(basename $TRUEPATH)
 readonly SELFPATH=$(cd "$(dirname $TRUEPATH)"; pwd -P)
 source $SELFPATH/settings
 
-
 function docker-reset() {
    supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw || true
    mkdir -p /usr/local/etc/supervisor.d/
@@ -165,9 +164,20 @@ function reboot() {
    osascript -e 'tell app "System Events" to shut down'
 }
 
+function reboot-novm() {
+   ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 3 && umount /mnt/home-${MAC_VM_GUEST_USER}/ && grub-reboot ${MAC_VM_HOST_NOVM_GRUB_INDEX} && shutdown -r now"
+   osascript -e 'tell app "System Events" to shut down'
+}
+
 function off() {
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop docker || true"
    ssh -f ${MAC_VM_HOST_SSH} "sleep 3 && umount /mnt/home-${MAC_VM_GUEST_USER}/ && shutdown -P now"
+   osascript -e 'tell app "System Events" to shut down'
+}
+
+function suspend() {
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 25 && echo -n mem > /sys/power/state && virsh start ${MAC_VM_HOST_GUEST_LIBVIRT_NAME}"
    osascript -e 'tell app "System Events" to shut down'
 }
 
@@ -188,6 +198,14 @@ case $i in
 
     reboot)
         reboot
+    ;;
+
+    reboot-novm)
+        reboot-novm
+    ;;
+
+    suspend)
+        suspend
     ;;
 
     off)
