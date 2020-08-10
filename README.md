@@ -50,6 +50,7 @@ export MAC_VM_HOST=host-name
 export MAC_VM_GUEST=guest-name
 export MAC_VM_DOCKER=docker-name
 export MAC_VM_DOCKER_MACADDR="aa:bb:cc:dd:ee:ff"
+export MAC_VM_HOST_GUEST_LIBVIRT_NAME=guest-vm-libvirt-name
 
 if [[ $(hostname) == "${MAC_VM_GUEST}" ]]; then
   export DOCKER_TLS_VERIFY="1"
