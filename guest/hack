@@ -197,7 +197,11 @@ function reboot-bios() {
 }
 
 function suspend() {
-   ssh -f ${MAC_VM_HOST_SSH} '/bin/bash -x -c "sleep 25 && echo -n mem > /sys/power/state && virsh start ${MAC_VM_HOST_GUEST_LIBVIRT_NAME}"'
+   suspend-target "$MAC_VM_HOST_GUEST_LIBVIRT_NAME"
+}
+
+function suspend-target() {
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 25 && echo -n mem > /sys/power/state && virsh start $1"
    osascript -e 'tell app "System Events" to shut down'
 }
 
@@ -211,7 +215,13 @@ if [[ "$#" -gt 0 ]]; then
             off
         ;;
         suspend)
-            suspend
+            if [[ "$#" -eq 0 ]]; then
+                suspend
+            else
+                target=$1
+                shift
+                suspend-target "$target"
+            fi
         ;;
         reboot)
             if [[ "$#" -eq 0 ]]; then
@@ -231,6 +241,9 @@ if [[ "$#" -gt 0 ]]; then
                   ;;
                   bios)
                      reboot-bios
+                  ;;
+                  *)
+                     reboot-target "$target"
                   ;;
                 esac
                 echo "reboot target: $target"
