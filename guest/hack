@@ -243,10 +243,10 @@ if [[ "$#" -gt 0 ]]; then
                      reboot-bios
                   ;;
                   *)
+                     echo "reboot target: $target"
                      reboot-target "$target"
                   ;;
                 esac
-                echo "reboot target: $target"
             fi
         ;;
         docker)
