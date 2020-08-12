@@ -61,4 +61,4 @@ if [[ $(hostname) == "${MAC_VM_GUEST}" ]]; then
 fi
 ```
 
-6. Install `brew install docker docker-machine && brew link docker`  then use `./hack docker-reset` to setup your guest.
+6. Install `brew install docker docker-machine && brew link docker`  then use `./hack docker reset` to setup your guest.
