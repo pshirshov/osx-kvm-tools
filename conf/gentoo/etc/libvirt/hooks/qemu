@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -x
+set -e
+
+#echo $* >> /tmp/qemu-hook-log.txt
+
+if [ "$3" == "end" ] && [ "$2" == "release" ] && [ "$1" == "catalina" ] ; then
+    radeon=0000:23:00
+
+    setpci -s "${radeon}.0" 7c.l=39d5e86b
+
+    sleep 1
+
+    echo "1" | tee -a "/sys/bus/pci/devices/${radeon}.0/remove"
+    echo "1" | tee -a "/sys/bus/pci/devices/${radeon}.1/remove"
+    sleep 1
+    echo "1" | tee -a /sys/bus/pci/rescan
+
+    sleep 2
+
+    # for some reason the clock may slip, on my machine 8 seconds means almost immediate wakeup
+
+    rtcwake -m mem -s 8 -u -v > /tmp/suspend.txt
+    echo "1" | tee -a /sys/bus/pci/rescan
+fi
