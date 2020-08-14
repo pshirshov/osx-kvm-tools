@@ -159,11 +159,13 @@ function docker-test() {
 }
 
 function stopdocker() {
+   ssh ${MAC_VM_HOST_SSH} "touch /tmp/going-to-shutdown"
    /usr/local/bin/supervisorctl -c /usr/local/etc/supervisord.ini stop dockerfw
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN stop -f docker || true"
+   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
+
    #ssh ${MAC_VM_HOST_SSH} "systemctl stop lxd || true"
    #ssh ${MAC_VM_HOST_SSH} "pkill -9 -f /var/lib/lxd/containers || true"
-   ssh ${MAC_VM_HOST_SSH} "umount -v -a -t nfs || true"
 }
 
 function off() {
