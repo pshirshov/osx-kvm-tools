@@ -22,6 +22,7 @@ profiles:
 - default
 config:
    security.nesting: "true"
+   security.privileged: "true"
    boot.autostart: "false"
    linux.kernel_modules: ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter,overlay
    user.vendor-data: |
@@ -32,6 +33,7 @@ config:
       ssh_authorized_keys:
          - "${pubkey}"
       timezone: Europe/Dublin
+      hostname: ${MAC_VM_DOCKER}
    user.user-data: |
       #cloud-config
       packages:
@@ -89,9 +91,16 @@ EOT
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN launch $BASEIMAGE docker < $tmpconfig"
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN exec docker -- /usr/bin/cloud-init status -w"
    ssh ${MAC_VM_HOST_SSH} "$LXCBIN restart docker"
-
+   printf "${GREEN}lxc container started${NC}\n"
    docker-machine rm -f default || true
-   docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} --generic-ssh-user ${MAC_VM_DOCKER_USER} --engine-storage-driver btrfs default
+   printf "${GREEN}Going to create the machine...${NC}\n"
+   docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} --generic-ssh-user ${MAC_VM_DOCKER_USER} --engine-storage-driver btrfs default || true
+   printf "${GREEN}Going to restart docker...${NC}\n"
+   ssh ${MAC_VM_DOCKER_SSH} -o "StrictHostKeyChecking no" "systemctl restart docker"
+   printf "${GREEN}Docker restarted, going to finish provisioning...${NC}\n"
+   docker-machine provision default
+   printf "${GREEN}Re-setting hostname to ${MAC_VM_DOCKER}...${NC}\n"
+   ssh ${MAC_VM_DOCKER_SSH} -o "StrictHostKeyChecking no" "hostnamectl set-hostname ${MAC_VM_DOCKER}"
    #docker-machine create -d generic --generic-ip-address ${MAC_VM_DOCKER} default
    eval "$(docker-machine env default)"
    supervisorctl -c /usr/local/etc/supervisord.ini update dockerfw
