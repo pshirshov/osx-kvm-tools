@@ -207,7 +207,7 @@ function reboot-bios() {
 }
 
 function suspend-target() {
-   ssh -f ${MAC_VM_HOST_SSH} "sleep 15 && echo -n mem > /sys/power/state && sleep 5 && virsh start $1 &> /tmp/virshresponse"
+   ssh -f ${MAC_VM_HOST_SSH} "sleep 25 && echo -n mem > /sys/power/state && sleep 5 && virsh start $1 &> /tmp/virshresponse"
    osascript -e 'tell app "System Events" to shut down'
 }
 
